@@ -54,6 +54,8 @@ class Company(Model):
         self.competence_mechanism = competence_mechanism
         self.promotion_strategy = promotion_strategy
 
+        self.current_id = 0
+
         assert (len(level_sizes) == len(level_weights)
                 ), "Incompatible dimensions (level sizes and weights)"
 
