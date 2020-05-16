@@ -1,4 +1,5 @@
 from mesa import Agent, Model
+from mesa.time import SimultaneousActivation
 from scipy.stats import truncnorm
 
 # Default parameters to reflect the choices in the original paper
@@ -12,6 +13,11 @@ class Employee(Agent):
     def get_older(self):
         """Existential crisis incoming while writing this :-("""
         self.age += 1
+
+    @property
+    def has_to_go(self):
+        return (self.competency <= self.model.dismissal_threshold
+                or self.age >= self.model.retirement_age)
 
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
@@ -41,8 +47,23 @@ class Company(Model):
                  competency_distribution=default_competency_dist,
                  dismissal_threshold=4,
                  retirement_age=60,
-                 competence_mechanism='common_sense',
+                 competency_mechanism='common_sense',
                  promotion_strategy='best'):
+
+        assert len(level_sizes) == len(level_weights), \
+            "Incompatible dimensions (level sizes and weights)"
+
+        assert hasattr(age_distribution, 'rvs'), \
+            "age_distribution must have a rvs method returning random values"
+
+        assert hasattr(competency_distribution, 'rvs'), \
+            "competency_distribution must have a rvs method returning random values"
+
+        assert promotion_strategy in ['best', 'worst', 'random'], \
+            "Unrecognized promotion_strategy"
+
+        assert competency_mechanism in ['common_sense', 'peter'], \
+            "Unrecognized competency_mechanism"
 
         # Not the best way to pack all the constants I have
         self.level_sizes = level_sizes
@@ -51,16 +72,71 @@ class Company(Model):
         self.competency_distribution = competency_distribution
         self.dismissal_threshold = dismissal_threshold
         self.retirement_age = retirement_age
-        self.competence_mechanism = competence_mechanism
+        self.competency_mechanism = competency_mechanism
         self.promotion_strategy = promotion_strategy
 
         self.current_id = 0
-
-        assert (len(level_sizes) == len(level_weights)
-                ), "Incompatible dimensions (level sizes and weights)"
+        self.schedule = SimultaneousActivation(self)
 
         # Create agents
         self.levels = []
         for level_size in level_sizes:
-            level = [Employee(self.next_id(), self) for j in range(level_size)]
+            level = []
+            for i in range(level_size):
+                agent = Employee(self.next_id(), self)
+                self.schedule.add(agent)
+                level.append(agent)
             self.levels.append(level)
+
+    def remove_employees(self):
+        for level in self.levels:
+            for employee in level:
+                if employee.has_to_go:
+                    level.remove(employee)
+                    self.schedule.remove(employee)
+
+    def pick_for_promotion_from(self, source_level):
+        if self.promotion_strategy == 'best':
+            return max(source_level, key=lambda e: e.competency)
+        elif self.promotion_strategy == 'worst':
+            return min(source_level, key=lambda e: e.competency)
+        elif self.promotion_strategy == 'random':
+            return self.random.choice(source_level)
+
+    def recalculate_competency(self, employee):
+        # Peter hypothesis: competency in new role not dependent on competency
+        #                   in previous role
+        if self.competency_mechanism == 'peter':
+            employee.competency = self.competency_distribution.rvs()
+        # Common-sense: competency mostly transferable from previous role
+        elif self.competency_mechanism == 'common_sense':
+            # TODO: abstract parameters used here
+            random_variation = self.random.uniform(-1, 1)
+            employee.competency += random_variation
+            employee.competency = min(max(0, employee.competency), 10)  # Clip
+
+    def promote_employees(self):
+        for upper_level, lower_level, target_size in zip(self.levels,
+                                                         self.levels[1:],
+                                                         self.level_sizes):
+            while len(upper_level) < target_size:
+                chosen_employee = self.pick_for_promotion_from(lower_level)
+                lower_level.remove(chosen_employee)
+                self.recalculate_competency(chosen_employee)
+                upper_level.append(chosen_employee)
+
+    def hire_employees(self):
+        bottom_level = self.levels[-1]
+        bottom_level_target_size = self.level_sizes[-1]
+        vacant_bottom_positions = bottom_level_target_size - len(bottom_level)
+
+        for i in range(vacant_bottom_positions):
+            agent = Employee(self.next_id(), self)
+            self.schedule.add(agent)
+            bottom_level.append(agent)
+
+    def step(self):
+        self.schedule.step()
+        self.remove_employees()
+        self.promote_employees()
+        self.hire_employees()
