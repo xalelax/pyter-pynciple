@@ -1,10 +1,25 @@
 from mesa import Agent, Model
 from mesa.time import SimultaneousActivation
+from mesa.datacollection import DataCollector
 from scipy.stats import truncnorm
+from numpy import dot
 
 # Default parameters to reflect the choices in the original paper
 default_age_dist = truncnorm(loc=25, scale=5, a=-1.4, b=7)
 default_competency_dist = truncnorm(loc=7, scale=2, a=-6, b=3)
+
+
+def calculate_efficiency(model):
+    # TODO: for now I am assuming that max competency = 10; relax this later
+    maximum_competency = 10
+    max_outcome = maximum_competency * \
+        dot(model.level_sizes, model.level_weights)
+
+    outcome_per_level = [sum(employee.competency for employee in level)
+                         for level in model.levels]
+    total_outcome = dot(outcome_per_level, model.level_weights)
+
+    return total_outcome/max_outcome
 
 
 class Employee(Agent):
@@ -88,6 +103,10 @@ class Company(Model):
                 level.append(agent)
             self.levels.append(level)
 
+        # Initialize data collection
+        self.data_collector = DataCollector(
+            model_reporters={'efficiency': calculate_efficiency})
+
     def remove_employees(self):
         for level in self.levels:
             for employee in level:
@@ -136,6 +155,7 @@ class Company(Model):
             bottom_level.append(agent)
 
     def step(self):
+        self.data_collector.collect(self)
         self.schedule.step()
         self.remove_employees()
         self.promote_employees()
