@@ -80,6 +80,8 @@ class Company(Model):
         assert competency_mechanism in ['common_sense', 'peter'], \
             "Unrecognized competency_mechanism"
 
+        super().__init__()
+
         # Not the best way to pack all the constants I have
         self.level_sizes = level_sizes
         self.level_weights = level_weights
