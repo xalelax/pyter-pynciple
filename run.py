@@ -1,12 +1,14 @@
+from model import Company
 from itertools import product
 import multiprocessing as mp
 from tqdm import tqdm
 import pandas as pd
 
-from model import Company
+import seaborn as sns
+sns.set_style("whitegrid")
 
 
-def get_sample_company(n_steps=100, **kwargs):
+def get_sample_company(n_steps=2000, **kwargs):
     """
     Runs a model for n_steps and returns a pandas.DataFrame
     containing the data collected at each step.
@@ -22,25 +24,45 @@ def get_sample_company(n_steps=100, **kwargs):
     return df
 
 
-mechanisms = ['common_sense', 'peter']
-strategies = ['best', 'worst', 'random']
-n_runs = 10
-n_proc = mp.cpu_count()
+if __name__ == "__main__":
 
-parameter_combinations = list(product(mechanisms, strategies, range(n_runs)))
+    mechanisms = ['common_sense', 'peter']
+    strategies = ['best', 'worst', 'random']
+    n_runs = 50
+    n_proc = mp.cpu_count()
 
-pbar = tqdm(total=len(parameter_combinations))
-with mp.Pool(n_proc) as pool:
-    results = []
-    for m, s, _ in parameter_combinations:
-        result = pool.apply_async(get_sample_company,
-                                  kwds={'competency_mechanism': m,
-                                        'promotion_strategy': s},
-                                  callback=lambda _: pbar.update())
-        results.append(result)
+    parameter_combinations = list(
+        product(mechanisms, strategies, range(n_runs)))
 
-    pool.close()
-    pool.join()
+    pbar = tqdm(total=len(parameter_combinations))
+    with mp.Pool(n_proc) as pool:
+        results = []
+        for m, s, _ in parameter_combinations:
+            result = pool.apply_async(get_sample_company,
+                                      kwds={'competency_mechanism': m,
+                                            'promotion_strategy': s},
+                                      callback=lambda _: pbar.update())
+            results.append(result)
 
-results = map(lambda x: x.get(), results)
-ensemble_df = pd.concat(results, ignore_index=True)
+        pool.close()
+        pool.join()
+
+    results = map(lambda x: x.get(), results)
+    ensemble_df = pd.concat(results, ignore_index=True)
+
+    eff_v_time = sns.relplot(col='competency_mechanism',
+                             hue='promotion_strategy',
+                             x='i',
+                             y='efficiency',
+                             data=ensemble_df,
+                             kind='line')
+
+    eff_v_time.set(xscale='log', xlim=(1, None))
+    eff_v_time.set_axis_labels('Simulation step', 'Efficiency [%]')
+
+    axes = eff_v_time.axes.flatten()
+    axes[0].legend(['Promote Best', 'Promote Worst', 'Promote Random'],
+                   loc='upper left',
+                   title='Promotion strategy')
+    axes[0].set_title("Common sense hypothesis")
+    axes[1].set_title("Peter principle")
