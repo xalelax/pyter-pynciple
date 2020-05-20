@@ -55,7 +55,8 @@ if __name__ == "__main__":
                              x='i',
                              y='efficiency',
                              data=ensemble_df,
-                             kind='line')
+                             kind='line',
+                             legend=None)
 
     eff_v_time.set(xscale='log', xlim=(1, None))
     eff_v_time.set_axis_labels('Simulation step', 'Efficiency [%]')
@@ -66,3 +67,7 @@ if __name__ == "__main__":
                    title='Promotion strategy')
     axes[0].set_title("Common sense hypothesis")
     axes[1].set_title("Peter principle")
+
+    eff_v_time.savefig('eff_v_time.svg')
+    eff_v_time.savefig('eff_v_time.png')
+
