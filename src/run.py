@@ -70,4 +70,3 @@ if __name__ == "__main__":
 
     eff_v_time.savefig('eff_v_time.svg')
     eff_v_time.savefig('eff_v_time.png')
-

@@ -27,7 +27,7 @@ class Employee(Agent):
 
     def get_older(self):
         """Existential crisis incoming while writing this :-("""
-        self.age += 1
+        self.age += self.model.timestep_years
 
     @property
     def has_to_go(self):
@@ -62,6 +62,7 @@ class Company(Model):
                  competency_distribution=default_competency_dist,
                  dismissal_threshold=4,
                  retirement_age=60,
+                 timestep_years=1,
                  competency_mechanism='common_sense',
                  promotion_strategy='best'):
 
@@ -89,6 +90,7 @@ class Company(Model):
         self.competency_distribution = competency_distribution
         self.dismissal_threshold = dismissal_threshold
         self.retirement_age = retirement_age
+        self.timestep_years = timestep_years
         self.competency_mechanism = competency_mechanism
         self.promotion_strategy = promotion_strategy
 
