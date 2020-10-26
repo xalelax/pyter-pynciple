@@ -3,12 +3,14 @@ from itertools import product
 import multiprocessing as mp
 from tqdm import tqdm
 import pandas as pd
+import click
 
+import matplotlib.pyplot as plt
 import seaborn as sns
 sns.set_style("whitegrid")
 
 
-def get_sample_company(n_steps=2000, **kwargs):
+def get_sample_company(n_steps, **kwargs):
     """
     Runs a model for n_steps and returns a pandas.DataFrame
     containing the data collected at each step.
@@ -24,32 +26,7 @@ def get_sample_company(n_steps=2000, **kwargs):
     return df
 
 
-if __name__ == "__main__":
-
-    mechanisms = ['common_sense', 'peter']
-    strategies = ['best', 'worst', 'random']
-    n_runs = 50
-    n_proc = mp.cpu_count()
-
-    parameter_combinations = list(
-        product(mechanisms, strategies, range(n_runs)))
-
-    pbar = tqdm(total=len(parameter_combinations))
-    with mp.Pool(n_proc) as pool:
-        results = []
-        for m, s, _ in parameter_combinations:
-            result = pool.apply_async(get_sample_company,
-                                      kwds={'competency_mechanism': m,
-                                            'promotion_strategy': s},
-                                      callback=lambda _: pbar.update())
-            results.append(result)
-
-        pool.close()
-        pool.join()
-
-    results = map(lambda x: x.get(), results)
-    ensemble_df = pd.concat(results, ignore_index=True)
-
+def plot_results(ensemble_df, save_figure=None):
     eff_v_time = sns.relplot(col='competency_mechanism',
                              hue='promotion_strategy',
                              x='i',
@@ -66,7 +43,50 @@ if __name__ == "__main__":
                    loc='upper left',
                    title='Promotion strategy')
     axes[0].set_title("Common sense hypothesis")
-    axes[1].set_title("Peter principle")
+    axes[1].set_title("Peter hypothesis")
 
-    eff_v_time.savefig('eff_v_time.svg')
-    eff_v_time.savefig('eff_v_time.png')
+    if save_figure:
+        eff_v_time.savefig('eff_v_time.svg')
+        eff_v_time.savefig('eff_v_time.png')
+    plt.show()
+
+
+def run_parallel(parameter_combinations, n_steps, n_proc=None):
+    if not n_proc:
+        n_proc = mp.cpu_count()
+
+    pbar = tqdm(total=len(parameter_combinations))
+    with mp.Pool(n_proc) as pool:
+        results = []
+        for m, s, _ in parameter_combinations:
+            result = pool.apply_async(get_sample_company,
+                                      kwds={'competency_mechanism': m,
+                                            'promotion_strategy': s,
+                                            'n_steps': n_steps},
+                                      callback=lambda _: pbar.update())
+            results.append(result)
+        pool.close()
+        pool.join()
+
+    return map(lambda x: x.get(), results)
+
+
+@click.command()
+@click.option('-n', '--n-runs', default=1)
+@click.option('-s', '--n-steps', default=200)
+@click.option('--savefig/--no-savefig', default=False)
+def main(n_runs, savefig, n_steps):
+    mechanisms = ['common_sense', 'peter']
+    strategies = ['best', 'worst', 'random']
+    parameter_combinations = list(
+        product(mechanisms, strategies, range(n_runs)))
+
+    results = run_parallel(parameter_combinations, n_steps)
+
+    ensemble_df = pd.concat(results, ignore_index=True)
+
+    plot_results(ensemble_df, savefig)
+
+
+if __name__ == "__main__":
+    main()
