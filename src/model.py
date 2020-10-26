@@ -1,7 +1,7 @@
 from mesa import Agent, Model
 from mesa.time import SimultaneousActivation
 from mesa.datacollection import DataCollector
-from scipy.stats import truncnorm
+from scipy.stats import truncnorm, binom, bernoulli
 from numpy import dot
 
 # Default parameters to reflect the choices in the original paper
@@ -31,8 +31,10 @@ class Employee(Agent):
 
     @property
     def has_to_go(self):
-        return (self.competency <= self.model.dismissal_threshold
-                or self.age >= self.model.retirement_age)
+        below_threshold = self.competency <= self.model.dismissal_threshold
+        reached_retirement = self.age >= self.model.retirement_age
+        leaving_randomly = self.model.dist_employees_leaving.rvs()
+        return below_threshold or reached_retirement or leaving_randomly
 
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
@@ -56,13 +58,15 @@ class Company(Model):
     """
 
     def __init__(self,
-                 level_sizes=[1, 5, 11, 21, 41, 81],
-                 level_weights=[1.0, 0.9, 0.8, 0.6, 0.4, 0.2],
+                 level_sizes=(1, 5, 10, 30),
+                 level_weights=(1.0, 0.8, 0.5, 0.2),
                  age_distribution=default_age_dist,
                  competency_distribution=default_competency_dist,
                  dismissal_threshold=4,
                  retirement_age=65,
-                 timestep_years=1,
+                 timestep_years=1/12.,
+                 initial_vacancy_fraction=0.2,
+                 p_employee_leaves=1/24.,
                  competency_mechanism='common_sense',
                  promotion_strategy='best'):
 
@@ -91,6 +95,8 @@ class Company(Model):
         self.dismissal_threshold = dismissal_threshold
         self.retirement_age = retirement_age
         self.timestep_years = timestep_years
+        self.initial_vacancy_fraction = initial_vacancy_fraction
+        self.dist_employees_leaving = bernoulli(p=p_employee_leaves)
         self.competency_mechanism = competency_mechanism
         self.promotion_strategy = promotion_strategy
 
@@ -101,7 +107,9 @@ class Company(Model):
         self.levels = []
         for level_size in level_sizes:
             level = []
-            for i in range(level_size):
+            n_initial_agents = binom(n=level_size, p=1-self.initial_vacancy_fraction).rvs()
+            n_initial_agents = max(1, n_initial_agents)
+            for i in range(n_initial_agents):
                 agent = Employee(self.next_id(), self)
                 self.schedule.add(agent)
                 level.append(agent)
@@ -142,7 +150,7 @@ class Company(Model):
         for upper_level, lower_level, target_size in zip(self.levels,
                                                          self.levels[1:],
                                                          self.level_sizes):
-            while len(upper_level) < target_size:
+            while len(upper_level) < target_size and len(lower_level):
                 chosen_employee = self.pick_for_promotion_from(lower_level)
                 lower_level.remove(chosen_employee)
                 self.recalculate_competency(chosen_employee)

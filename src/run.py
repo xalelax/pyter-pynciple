@@ -27,7 +27,7 @@ def simulate_sample_company(n_steps, **kwargs):
     return df
 
 
-def plot_results(ensemble_df, save_figure=None):
+def plot_results(ensemble_df, save_figure=None, logaxes=None):
     eff_v_time = sns.relplot(col='competency_mechanism',
                              hue='promotion_strategy',
                              x='year',
@@ -36,7 +36,8 @@ def plot_results(ensemble_df, save_figure=None):
                              kind='line',
                              legend=None)
 
-    eff_v_time.set(xscale='log', xlim=(1, None))
+    if logaxes:
+        eff_v_time.set(xscale='log', xlim=(1, None))
     eff_v_time.set_axis_labels('Time (years)', 'Efficiency [%]')
 
     axes = eff_v_time.axes.flatten()
@@ -76,7 +77,8 @@ def run_parallel(parameter_combinations, n_steps, n_proc=None):
 @click.option('-n', '--n-runs', default=1)
 @click.option('-s', '--n-steps', default=200)
 @click.option('--savefig/--no-savefig', default=False)
-def main(n_runs, savefig, n_steps):
+@click.option('--logaxes/--no-logaxes', default=False)
+def main(n_runs, savefig, n_steps, logaxes):
     mechanisms = ['common_sense', 'peter']
     strategies = ['best', 'worst', 'random']
     parameter_combinations = list(
@@ -86,7 +88,7 @@ def main(n_runs, savefig, n_steps):
 
     ensemble_df = pd.concat(results, ignore_index=True)
 
-    plot_results(ensemble_df, savefig)
+    plot_results(ensemble_df, savefig, logaxes)
 
 
 if __name__ == "__main__":
