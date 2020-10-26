@@ -10,7 +10,7 @@ import seaborn as sns
 sns.set_style("whitegrid")
 
 
-def get_sample_company(n_steps, **kwargs):
+def simulate_sample_company(n_steps, **kwargs):
     """
     Runs a model for n_steps and returns a pandas.DataFrame
     containing the data collected at each step.
@@ -23,20 +23,21 @@ def get_sample_company(n_steps, **kwargs):
     df['i'] = df.index
     df['competency_mechanism'] = model.competency_mechanism
     df['promotion_strategy'] = model.promotion_strategy
+    df['year'] = df['i'] * model.timestep_years
     return df
 
 
 def plot_results(ensemble_df, save_figure=None):
     eff_v_time = sns.relplot(col='competency_mechanism',
                              hue='promotion_strategy',
-                             x='i',
+                             x='year',
                              y='efficiency',
                              data=ensemble_df,
                              kind='line',
                              legend=None)
 
     eff_v_time.set(xscale='log', xlim=(1, None))
-    eff_v_time.set_axis_labels('Simulation step', 'Efficiency [%]')
+    eff_v_time.set_axis_labels('Time (years)', 'Efficiency [%]')
 
     axes = eff_v_time.axes.flatten()
     axes[0].legend(['Promote Best', 'Promote Worst', 'Promote Random'],
@@ -59,7 +60,7 @@ def run_parallel(parameter_combinations, n_steps, n_proc=None):
     with mp.Pool(n_proc) as pool:
         results = []
         for m, s, _ in parameter_combinations:
-            result = pool.apply_async(get_sample_company,
+            result = pool.apply_async(simulate_sample_company,
                                       kwds={'competency_mechanism': m,
                                             'promotion_strategy': s,
                                             'n_steps': n_steps},
