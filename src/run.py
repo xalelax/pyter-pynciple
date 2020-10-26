@@ -48,7 +48,7 @@ def plot_results(ensemble_df, save_figure=None):
 
     if save_figure:
         eff_v_time.savefig('eff_v_time.svg')
-        eff_v_time.savefig('eff_v_time.png')
+        print("Figure saved!")
     plt.show()
 
 

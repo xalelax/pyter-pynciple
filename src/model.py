@@ -6,7 +6,7 @@ from numpy import dot
 
 # Default parameters to reflect the choices in the original paper
 default_age_dist = truncnorm(loc=25, scale=5, a=-1.4, b=7)
-default_competency_dist = truncnorm(loc=7, scale=2, a=-6, b=3)
+default_competency_dist = truncnorm(loc=7, scale=2, a=-3, b=1.5)
 
 
 def calculate_efficiency(model):
@@ -61,7 +61,7 @@ class Company(Model):
                  age_distribution=default_age_dist,
                  competency_distribution=default_competency_dist,
                  dismissal_threshold=4,
-                 retirement_age=60,
+                 retirement_age=65,
                  timestep_years=1,
                  competency_mechanism='common_sense',
                  promotion_strategy='best'):
